@@ -6,15 +6,6 @@ using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client.Options;
 using MQTTnet.Extensions.ManagedClient;
-using MQTTnet.Protocol;
-
-/// Useful links:
-///     MqttNet source code: https://github.com/chkr1011/MQTTnet
-///     Mqtt details: https://mosquitto.org/man/mqtt-7.html
-///     Mqtt qos security details: http://www.steves-internet-guide.com/understanding-mqtt-qos-levels-part-1/
-///
-/// Note! RabbitMq does not suppert QoS 2 (Exactly once), and will downgrade the security to QoS 1 (At least once).
-///     See: https://www.rabbitmq.com/mqtt.html
 
 namespace MqttDotnetClient
 {
@@ -33,9 +24,8 @@ namespace MqttDotnetClient
         
         public static void Main(string[] args)
         {
-            var options = CreateManagedMqttClientOptions();
-            var mqttClient = CreateManagedMqttClient();
-            SetupMqttClient(mqttClient, options).Wait();
+            var mqttClient = new MqttFactory().CreateManagedMqttClient();
+            SetupMqttClient(mqttClient).Wait();
             
             Console.ReadLine();
 
@@ -56,22 +46,16 @@ namespace MqttDotnetClient
             return options;
         }
 
-        private static IManagedMqttClient CreateManagedMqttClient()
+        private static async Task SetupMqttClient(IManagedMqttClient mqttClient)
         {
-            var mqttClient = new MqttFactory().CreateManagedMqttClient();
-            return mqttClient;
-        }
-
-        private static async Task SetupMqttClient(IManagedMqttClient mqttClient, ManagedMqttClientOptions options)
-        {
-            
+            var options = CreateManagedMqttClientOptions();
             mqttClient.UseApplicationMessageReceivedHandler(async e =>
             {
                 Console.WriteLine("### RECEIVED APPLICATION MESSAGE ###");
                 Console.WriteLine($"+ Topic = {e.ApplicationMessage.Topic}");
                 Console.WriteLine($"+ Payload = {Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}");
                 Console.WriteLine($"+ QoS = {e.ApplicationMessage.QualityOfServiceLevel}");
-                Console.WriteLine($"+ Retain = {e.ApplicationMessage.Retain}");
+                Console.WriteLine($"+ Retained = {e.ApplicationMessage.Retain}");
                 Console.WriteLine();
 
                 await mqttClient.PublishAsync(CreateMessage());
