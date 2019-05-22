@@ -2,6 +2,7 @@
 using System.IO;
 using System.Security.Cryptography.X509Certificates;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using MQTTnet;
 using MQTTnet.Client.Options;
@@ -11,7 +12,10 @@ namespace MqttDotnetClient
 {
     internal class Program
     {
-        private const string MqttBrokerHostname = "localhost";
+        private static bool InContainer => 
+            Environment.GetEnvironmentVariable("RUNNING_IN_CONTAINER") == "true";
+        
+        private static string MqttBrokerHostname => InContainer ? "rabbitmq-service" : "localhost";
         private const int MqttBrokerPort = 8883;
         private const string CertificatePath = "client_certificate.p12";
         private const string CertificatePassword = "password";
@@ -27,7 +31,7 @@ namespace MqttDotnetClient
             var mqttClient = new MqttFactory().CreateManagedMqttClient();
             SetupMqttClient(mqttClient).Wait();
             
-            Console.ReadLine();
+            Thread.Sleep(TimeSpan.FromMinutes(2));
 
             mqttClient.StopAsync().Wait(TimeSpan.FromSeconds(5));
         }
@@ -48,6 +52,8 @@ namespace MqttDotnetClient
 
         private static async Task SetupMqttClient(IManagedMqttClient mqttClient)
         {
+            await mqttClient.SubscribeAsync(CreateTopicFilter());
+            
             var options = CreateManagedMqttClientOptions();
             mqttClient.UseApplicationMessageReceivedHandler(async e =>
             {
@@ -56,6 +62,7 @@ namespace MqttDotnetClient
                 Console.WriteLine($"+ Payload = {Encoding.UTF8.GetString(e.ApplicationMessage.Payload)}");
                 Console.WriteLine($"+ QoS = {e.ApplicationMessage.QualityOfServiceLevel}");
                 Console.WriteLine($"+ Retained = {e.ApplicationMessage.Retain}");
+                Console.WriteLine($"+ ProcessingFailed = {e.ProcessingFailed}");
                 Console.WriteLine();
 
                 await mqttClient.PublishAsync(CreateMessage());
@@ -64,20 +71,23 @@ namespace MqttDotnetClient
             mqttClient.UseConnectedHandler(async e =>
             {
                 Console.WriteLine("### CONNECTED WITH SERVER ###");
-
-                await mqttClient.SubscribeAsync(CreateTopicFilter());
-            
-                await mqttClient.PublishAsync(CreateMessage());
-
-                Console.WriteLine("### SUBSCRIBED ###");
             });
 
-            mqttClient.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(e =>
+            mqttClient.UseDisconnectedHandler(async e =>
             {
+                Console.WriteLine("### DISCONNECTED FROM SERVER ###");
                 Console.WriteLine(e.Exception.GetBaseException().Message);
             });
+
+//            mqttClient.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(e =>
+//            {
+//                Console.WriteLine("### CONNECTION FAILED ###");
+//                Console.WriteLine(e.Exception.GetBaseException().Message);
+//            });
             
             await mqttClient.StartAsync(options);
+            
+            await mqttClient.PublishAsync(CreateMessage());
         }
 
         private static void UpdateTlsParameters(MqttClientOptionsBuilderTlsParameters tlsParameters)

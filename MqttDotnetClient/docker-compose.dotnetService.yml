@@ -1,0 +1,15 @@
+version: '3.4'
+
+services:
+  dotnet-service:
+    image: dotnet-service:${VERSION}
+    hostname: dotnet-service
+    build:
+      context: .
+      dockerfile: MqttDotnetClient/Dockerfile
+    networks:
+      - backend_network
+
+networks:
+  backend_network:
+    external: true
