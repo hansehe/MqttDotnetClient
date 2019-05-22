@@ -78,12 +78,6 @@ namespace MqttDotnetClient
                 Console.WriteLine("### DISCONNECTED FROM SERVER ###");
                 Console.WriteLine(e.Exception.GetBaseException().Message);
             });
-
-//            mqttClient.ConnectingFailedHandler = new ConnectingFailedHandlerDelegate(e =>
-//            {
-//                Console.WriteLine("### CONNECTION FAILED ###");
-//                Console.WriteLine(e.Exception.GetBaseException().Message);
-//            });
             
             await mqttClient.StartAsync(options);
             
